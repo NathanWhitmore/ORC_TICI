@@ -348,6 +348,7 @@ my.leaflet <- reactive({
     
     addCircleMarkers(
       data = tici.locations ,
+      radius = 9,
       color = ~ palPwr(rating),
       popup = paste(
         "Date:",
