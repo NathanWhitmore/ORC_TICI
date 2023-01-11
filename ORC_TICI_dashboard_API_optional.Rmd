@@ -92,7 +92,7 @@ radioButtons(
 <br/>
 
 
-**Option: spatial area**
+**Select area**
 
 
 * Select an area either square, circular, or a polygon area
@@ -219,6 +219,8 @@ tici.df <- reactive ({
     tici.df <- tici.df %>%
       st_as_sf(coords = c("Longitude", "Latitude"),
                crs = 4326)
+    
+    tici.df$CollectionDate <- ymd(tici.df$CollectionDate)
     
     tici.df
     
@@ -632,7 +634,7 @@ my.plot <- reactive ({
                                       "100 - good",
                                       "110 - excellent",
                                       "120 - pristine"),
-                           limits = c(50, 140)
+                           limits = c(60, 130)
                            ) +
     geom_smooth(method = "lm",
                 se = FALSE,
@@ -657,7 +659,8 @@ my.plot <- reactive ({
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
     theme(plot.margin = margin(1, 1, 1.5, 1.2, "cm")) +
     labs(colour = "TICI rating\n") +
-    ggtitle("Locations given in NZTM")
+    ggtitle("Locations given in NZTM")+
+    scale_x_date(date_labels = "%d %b %Y")
   
   # turn off hover info for geom_line
   my.plot <- ggplotly(my.plot, tooltip = "text") %>%   
@@ -771,3 +774,15 @@ renderPlotly({
 **R compatibility**
 
 The dashboard was constructed under R version 4.2.0. To improve reproducibility the final version will use "renv" to ensuring the compatibility of the package. The final project will be available from github and be licensed under a permissive MIT license.
+
+### Check
+
+```{r}
+renderPrint({
+  
+  str(my.graph.data())
+  
+})
+
+```
+
