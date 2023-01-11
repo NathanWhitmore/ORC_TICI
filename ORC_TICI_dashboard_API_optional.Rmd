@@ -40,6 +40,10 @@ library(plotly)
 library(viridisLite)
 library(igraph)
 library(DT)
+library(wilderlab)
+library(insect)
+
+# remotes::install_github("wilderlabnz/wilderlab") 
 
 ```
 
@@ -48,9 +52,7 @@ library(DT)
 NZ <- st_read("Data/regional-council-2022-generalised.shp", quiet = TRUE)
 NZ  <- NZ %>% st_transform(crs = 4326)
 
-
 # special function
-
 group_points <- function(points, distance){
   ## get distance matrix
   dist_matrix = st_distance(points, by_element = FALSE)
@@ -73,35 +75,18 @@ Beta version
 Column {.sidebar}
 -----------------------------------------------------------------------
 
-**Option: data**
+**Upload data from**
 
 ```{r}
 radioButtons(
   "choice",
-  label = "Upload from",
-  choices = list("Wilderlab API" = "Wilderlab", 
+  label = "",
+  choices = list("Wilderlab API" = "wilderlab", 
                  "Local drive" = "local"),
-  selected = "Wilderlab"
+  selected = "wilderlab"
 )
 
-conditionalPanel(
-  condition = "input.choice == 'full'",
-  selectInput(
-    "iterations",
-    label = "Number of iterations",
-    choices = list(
-      "2" = 2,
-      "10" = 10,
-      "50" = 50,
-      "100" = 100,
-      "200" = 200,
-      "250" = 250,
-      "500" = 500,
-      "1000" = 1000
-    ),
-    selected = 100
-  )
-)
+
 ```
 
 <br/>
@@ -186,132 +171,222 @@ sp.file <- eventReactive(input$mymap_draw_new_feature,{
 
 ```
 
+```{r}
+# API subroutine
+
+
+
+tici.df <- reactive ({
+  if (input$choice == "wilderlab") {
+    APIs <-  read_excel("API keys/API keys.xlsx")
+    samples <-
+      get_wilderdata(
+        "samples",
+        key = APIs$key,
+        secret = APIs$secret,
+        xapikey = APIs$xapikey
+      )
+    
+    tici.df <- samples
+    
+    # make tici rating categories
+    tici.df$TICIRating <-
+      cut(tici.df$TICI, breaks = c(10, 80, 90, 100, 110, 120, 200))
+    
+    
+    # rename levels
+    levels(tici.df$TICIRating) <-
+      c("Very poor",
+        "Poor",
+        "Average",
+        "Good",
+        "Excellent",
+        "Pristine")
+    
+    # make tici reliability categories
+    tici.df$TICIReliability <-
+      cut(tici.df$TICINoSeqs, breaks = c(0, 150, 250, 350, Inf))
+    
+    
+    # rename levels
+    levels(tici.df$TICIReliability) <-
+      c("Low",
+        "Average",
+        "High",
+        "Very high")
+    
+    # make into sf
+    tici.df <- tici.df %>%
+      st_as_sf(coords = c("Longitude", "Latitude"),
+               crs = 4326)
+    
+    tici.df
+    
+    
+  } else {
+    # get file list
+    file.list <-
+      list.files("Wilderlab_full_results", pattern = '*.xlsx')
+    
+    # read list
+    dir <- paste0("Wilderlab_full_results", "/", file.list)
+    
+    # read all files
+    tici.list <- lapply(dir, function(x)
+      read_excel(x, sheet = "indices"))
+    
+    # change all data to character
+    tici.indices <-
+      bind_rows(lapply(tici.list , function(x) {
+        mutate_all(x, as.character)
+      }))
+    
+    # change certain columns back to numeric
+    tici.indices$UID <- as.numeric(tici.indices$UID)
+    tici.indices$TICI_value <-
+      round(as.numeric(tici.indices$TICI_value), 2)
+    tici.indices$TICI_quantile <-
+      as.numeric(tici.indices$TICI_quantile)
+    tici.indices$TICI_nseqs <- as.numeric(tici.indices$TICI_nseqs)
+    
+    ## extract metadata
+    tici.meta <-
+      lapply(dir, function(x)
+        read_excel(x, sheet = "metadata"))
+    
+    # make extraction function
+    
+    extract.meta <- function(x) {
+      metadata <- x[19:nrow(x),]
+      colnames(metadata) <- metadata[1,]
+      metadata <- data.frame(metadata[2:nrow(metadata),])
+      
+    }
+    
+    # apply over all workbooks
+    tici.meta.list <- lapply(tici.meta, function(x)
+      extract.meta(x))
+    
+    
+    # change to character
+    tici.meta.data <-
+      bind_rows(lapply(tici.meta.list, function(x) {
+        mutate_all(x, as.character)
+      }))
+    
+    ## control mixed dates
+    
+    # copy excel dates to new column
+    tici.meta.data$otherDate <-
+      ifelse(
+        str_count(tici.meta.data$CollectionDate) != 10,
+        tici.meta.data$CollectionDate,
+        ""
+      )
+    tici.meta.data$otherDate <- as.numeric(tici.meta.data$otherDate)
+    
+    # change to normal date
+    tici.meta.data$otherDate <-
+      as.Date(tici.meta.data$otherDate, origin = "1899-12-30")
+    
+    # remove excel dates from original
+    tici.meta.data$CollectionDate <-
+      ifelse(
+        str_count(tici.meta.data$CollectionDate) == 10,
+        tici.meta.data$CollectionDate,
+        ""
+      )
+    
+    # change to date
+    tici.meta.data$CollectionDate <-
+      ymd(tici.meta.data$CollectionDate)
+    
+    # coalesce
+    tici.meta.data$CollectionDate <-
+      coalesce(tici.meta.data$CollectionDate, tici.meta.data$otherDate)
+    
+    # change back to numeric
+    tici.meta.data$UID <- as.numeric(tici.meta.data$UID)
+    tici.meta.data$Latitude <- as.numeric(tici.meta.data$Latitude)
+    tici.meta.data$Longitude <- as.numeric(tici.meta.data$Longitude)
+    
+    # join
+    tici.df <- left_join(tici.meta.data, tici.indices, by = "UID")
+    
+    # change names to match API
+    tici.df <- tici.df %>% rename(
+      "TICI" = "TICI_value",
+      "TICINoSeqs" = "TICI_nseqs",
+      "TICIQuantile" = "TICI_quantile",
+      "TICIVersion"  = "TICI_version",
+      "TICIRating"  = "TICI_rating",
+      "TICIReliability" = "TICI_reliability"
+    )
+    
+    # make into sf
+    tici.df <- tici.df %>%
+      st_as_sf(coords = c("Longitude", "Latitude"),
+               crs = 4326)
+    
+    # remove NA tici
+    #tici.df <- tici.df %>% filter(TICI_rating != "Not calculated")
+    
+    tici.df
+    
+    
+    
+  }
+  
+})
+
+```
+
 
 
 ```{r}
-
-
-# get file list
-file.list <- list.files("Wilderlab_full_results", pattern = '*.xlsx')
-
-# read list
-dir <- paste0("Wilderlab_full_results", "/", file.list)
-
-# read all files
-tici.list <-
-  lapply(dir, function(x)
-    read_excel(x, sheet = "indices"))
-
-# change all data to character
-tici.indices <-
-  bind_rows(lapply(tici.list , function(x) {
-    mutate_all(x, as.character)
-  }))
-
-# change certain columns back to numeric
-tici.indices$UID <- as.numeric(tici.indices$UID)
-tici.indices$TICI_value <-
-  round(as.numeric(tici.indices$TICI_value), 2)
-tici.indices$TICI_quantile <- as.numeric(tici.indices$TICI_quantile)
-tici.indices$TICI_nseqs <- as.numeric(tici.indices$TICI_nseqs)
-
-## extract metadata
-tici.meta <-
-  lapply(dir, function(x)
-    read_excel(x, sheet = "metadata"))
-
-# make extraction function
-
-extract.meta <- function(x) {
-  metadata <- x[19:nrow(x), ]
-  colnames(metadata) <- metadata[1, ]
-  metadata <- data.frame(metadata[2:nrow(metadata), ])
-  
-}
-
-# apply over all workbooks
-tici.meta.list <- lapply(tici.meta, function(x)
-  extract.meta(x))
-
-
-# change to character
-tici.meta.data <-
-  bind_rows(lapply(tici.meta.list, function(x) {
-    mutate_all(x, as.character)
-  }))
-
-## control mixed dates
-
-# copy excel dates to new column
-tici.meta.data$otherDate <-
-  ifelse(str_count(tici.meta.data$CollectionDate) != 10,
-         tici.meta.data$CollectionDate,
-         "")
-tici.meta.data$otherDate <- as.numeric(tici.meta.data$otherDate)
-
-# change to normal date
-tici.meta.data$otherDate <-
-  as.Date(tici.meta.data$otherDate, origin = "1899-12-30")
-
-# remove excel dates from original
-tici.meta.data$CollectionDate <-
-  ifelse(str_count(tici.meta.data$CollectionDate) == 10,
-         tici.meta.data$CollectionDate,
-         "")
-
-# change to date
-tici.meta.data$CollectionDate <- ymd(tici.meta.data$CollectionDate)
-
-# coalesce
-tici.meta.data$CollectionDate <-
-  coalesce(tici.meta.data$CollectionDate, tici.meta.data$otherDate)
-
-# change back to numeric
-tici.meta.data$UID <- as.numeric(tici.meta.data$UID)
-tici.meta.data$Latitude <- as.numeric(tici.meta.data$Latitude)
-tici.meta.data$Longitude <- as.numeric(tici.meta.data$Longitude)
-
-# join
-tici.df <- left_join(tici.meta.data, tici.indices, by = "UID")
-
-# make into sf
-tici.df <- tici.df %>%
-  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
-
-# remove NA tici
-tici.df <- tici.df %>% filter(TICI_rating != "Not calculated")
-
-
 # summary
-
-tici.sum <- tici.df %>%
+tici.sum <- reactive ({
+  
+  tici.sum <- tici.df() %>%
   group_by(geometry, CollectionDate) %>%
   summarise(
-    average = mean(TICI_value, rm.na = TRUE),
-    range = paste(round(min(TICI_value), 2), "–", round(max(TICI_value), 2)),
+    average = mean(TICI, rm.na = TRUE),
+    range = paste(round(min(TICI), 2), "–", round(max(TICI), 2)),
     no_samples = n(),
     no_dates = n_distinct(CollectionDate)
   )
 
-tici.sum$average <- round(tici.sum$average, 2)
+  tici.sum$average <- round(tici.sum$average, 2)
 
 
 
 # make tici categories
-tici.sum$rating <-
-  cut(tici.sum$average, breaks = c(10, 80, 90, 100, 110, 120, 200))
+  tici.sum$rating <-
+    cut(tici.sum$average, breaks = c(10, 80, 90, 100, 110, 120, 200))
 
 
 # rename levels
-levels(tici.sum$rating) <-
-  c("Very poor", "Poor", "Average", "Good", "Excellent", "Pristine")
+  levels(tici.sum$rating) <-
+    c("Very poor", "Poor", "Average", "Good", "Excellent", "Pristine")
 
-tici.sum$rating <- fct_rev(tici.sum$rating)
-
-# site locations change to spatial
-tici.locations <- sf::as_Spatial(tici.sum)
+  tici.sum$rating <- fct_rev(tici.sum$rating)
+  
+  tici.sum
+  
+})
 
 ```
+
+
+```{r}
+# site locations change to spatial
+tici.locations <- reactive({
+  
+  sf::as_Spatial(tici.sum())
+  
+})
+```
+
 
 Row {.tabset .tabset-fade}
 -------------------------------------
@@ -323,14 +398,16 @@ Row {.tabset .tabset-fade}
 
 # visualise site locations
 # Create a continuous palette function
-palPwr <-
-  colorFactor(c("red", "purple", "lightblue",  "white", "yellow", "orange"),
-              domain = tici.locations$rating)
 
 
 leafletOutput("mymap", height = 800)
 
 my.leaflet <- reactive({
+  
+  palPwr <-
+  colorFactor(c("red", "purple", "lightblue",  "white", "yellow", "orange"),
+              domain = tici.locations()$rating)
+
   
   leaflet(options = leafletOptions(worldCopyJump = TRUE)) %>%
     
@@ -380,30 +457,30 @@ my.leaflet <- reactive({
                 weight = 1) %>%
     
     addCircleMarkers(
-      data = tici.locations ,
+      data = tici.locations() ,
       radius = 9,
       color = ~ palPwr(rating),
       popup = paste(
         "Date:",
-        tici.locations$CollectionDate,
+        tici.locations()$CollectionDate,
         "<br>",
         "TICI average:",
-        tici.locations$average,
+        tici.locations()$average,
         "<br>",
         "TICI range:",
-        tici.locations$range,
+        tici.locations()$range,
         "<br>",
         "No of samples:",
-        tici.locations$no_samples,
+        tici.locations()$no_samples,
         "<br>"
       )
     ) %>%
     
     addLegend(
-      data = tici.locations ,
+      data = tici.locations() ,
       position = "topright",
       pal = palPwr,
-      values = tici.locations$rating,
+      values = tici.locations()$rating,
       title = "Water quality"
     ) %>%
     
@@ -455,14 +532,14 @@ my.selection <- reactive({
       
       my.circle <- st_buffer(sp.file(), sp.file()$radius) 
       
-     tici.df %>%
+     tici.df() %>%
       st_as_sf(coords = c("longitude", "latitude"),
                crs = 4326) %>%
       st_intersection(my.circle) 
       
     } else {
       
-      tici.df %>%
+      tici.df() %>%
       st_as_sf(coords = c("longitude", "latitude"),
                crs = 4326) %>%
       st_intersection(sp.file())
@@ -478,6 +555,7 @@ my.selection <- reactive({
 my.graph.data <-
   
   reactive({
+    
     # get intersection
     my.data <- my.selection()
     
@@ -485,8 +563,8 @@ my.graph.data <-
     my.data <- my.data %>% st_transform(crs = 2193)
     
     # relevel tici rating
-    my.data$TICI_rating <- factor(
-      my.data$TICI_rating,
+    my.data$TICIRating <- factor(
+      my.data$TICIRating,
       levels = c(
         "Pristine",
         "Excellent",
@@ -521,6 +599,7 @@ my.graph.data <-
 
   })
 
+
 my.plot <- reactive ({
   
   # my viridis palette padded to provide more variability in middle
@@ -531,14 +610,14 @@ my.plot <- reactive ({
     my.graph.data(),
     aes(
       x = CollectionDate,
-      y = TICI_value,
-      colour = TICI_value,
+      y = TICI,
+      colour = TICI,
       text = paste(
         "Collection date:",  CollectionDate,
         "\nClient ID:", ClientSampleID,
-        "\nTICI value",  TICI_value,
-        "\nTICI rating",  TICI_rating,
-        "\nTICI reliability:",TICI_reliability
+        "\nTICI value",  TICI,
+        "\nTICI rating",  TICIRating,
+        "\nTICI reliability:",TICIReliability
 
       ),
       group = location
@@ -630,10 +709,10 @@ renderPlotly({
                                   "CollectionDate", 
                                   "VolumeFilteredML",
                                   "ClientNotes" ,
-                                  "TICI_version" ,    
-                                  "TICI_value" ,  
-                                  "TICI_rating",
-                                  "TICI_reliability",
+                                  "TICIVersion" ,    
+                                  "TICI" ,  
+                                  "TICIRating",
+                                  "TICIReliability",
                                   "UID", 
                                   "location")]
     
@@ -683,21 +762,12 @@ renderPlotly({
 
 \newline
 
-1. **Data extract tab:** a simplified version of the data within the selected area is shown here. By click on the arrows at the top of each column you can sort the data set by the specific variable.
+3. **Data extract tab:** a simplified version of the data within the selected area is shown here. By click on the arrows at the top of each column you can sort the data set by the specific variable.
 
    * The data from the selected area can be downloaded as a csv by clicking on the **Download as csv file** button.
    
 <br/>
    
-**Coming soon**
-
-
-* Recently Wilderlab have added TICI data to their API. However, they are currently experiencing teething issues. 
-* A user option will be included so that people may choose between using stored data or reading directly from the Wilderlab API.
-
-
-<br/>
-
 **R compatibility**
 
 The dashboard was constructed under R version 4.2.0. To improve reproducibility the final version will use "renv" to ensuring the compatibility of the package. The final project will be available from github and be licensed under a permissive MIT license.
