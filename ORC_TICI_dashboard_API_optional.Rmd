@@ -1,5 +1,5 @@
 ---
-title: "ORC TICI dashboard"
+title: "Taxon-Independent Community Index (TICI) dashboard"
 runtime: shiny
 output:
   flexdashboard::flex_dashboard:
@@ -67,8 +67,7 @@ group_points <- function(points, distance){
 ```
 
 
-Beta version
-=====================================
+
 
 
 
@@ -150,7 +149,7 @@ output$downloadUI <- renderUI( {
 output$downBtn <- downloadHandler(
   filename = function() {'Name this file.csv'},
   content = function(file) {
-    write.csv(my.graph.data(), file, row.names = FALSE)
+    write.csv(download.table(), file, row.names = FALSE)
   }
 )
 ```
@@ -173,8 +172,6 @@ sp.file <- eventReactive(input$mymap_draw_new_feature,{
 
 ```{r}
 # API subroutine
-
-
 
 tici.df <- reactive ({
   if (input$choice == "wilderlab") {
@@ -334,8 +331,6 @@ tici.df <- reactive ({
     #tici.df <- tici.df %>% filter(TICI_rating != "Not calculated")
     
     tici.df
-    
-    
     
   }
   
@@ -593,7 +588,7 @@ my.graph.data <-
 
     # attach to points
     my.data <- left_join(my.data, centroids, by = "group")
-    my.data$location <-
+    my.data$Location <-
       paste(round(my.data$X, 0), "E", round(my.data$Y, 0), "N")
     my.data$geometry <- NULL
     my.data$st_union.geometry. <- NULL
@@ -617,12 +612,12 @@ my.plot <- reactive ({
       text = paste(
         "Collection date:",  CollectionDate,
         "\nClient ID:", ClientSampleID,
-        "\nTICI value",  TICI,
+        "\nTICI score",  TICI,
         "\nTICI rating",  TICIRating,
         "\nTICI reliability:",TICIReliability
 
       ),
-      group = location
+      group = Location
     )
   ) +
     theme_bw() +
@@ -643,7 +638,7 @@ my.plot <- reactive ({
                shape = 20,
                alpha = 0.8) +
     
-    facet_wrap(~ location) +
+    facet_wrap(~ Location) +
     xlab("Collection Date") +
     ylab("TICI Score") +
     theme(axis.title.y = element_text(
@@ -706,18 +701,27 @@ renderPlotly({
 
   table.data <-reactive({
   
-  my.graph.data()[,
-                                c("ClientSampleID",
-                                  "CollectedBy",
-                                  "CollectionDate", 
-                                  "VolumeFilteredML",
-                                  "ClientNotes" ,
-                                  "TICIVersion" ,    
-                                  "TICI" ,  
-                                  "TICIRating",
-                                  "TICIReliability",
-                                  "UID", 
-                                  "location")]
+   table.data <- my.graph.data()[, c("ClientSampleID",
+                      "Location",
+                       # "CollectedBy",
+                       "CollectionDate", 
+                       "TICI" ,
+                       "TICIRating",
+                       "TICIReliability",
+                       # "VolumeFilteredML",
+                       # "ClientNotes" ,
+                       # "UID", 
+                       "TICIVersion")]
+   
+   table.data <- table.data %>% 
+     rename(`Client sample ID` = ClientSampleID,
+            `Collection date` = CollectionDate, 
+            `TICI score` = TICI,
+            `TICI rating` = TICIRating,
+            `TICI reliability` = TICIReliability,
+            `TICI version` = TICIVersion)
+   
+   table.data
     
   })
   
@@ -741,21 +745,41 @@ renderPlotly({
   
 ```
 
+```{r}
+# make download table
 
-### Instructions
+ download.table <- reactive({
+  
+  download.table <- my.graph.data() %>% 
+    select(-c(X_leaflet_id, 
+           feature_type,
+           group,
+           X,
+           Y,
+           Location))
+  
+  download.table 
+  
+})
+
+```
+
+
+### Instructions & Glossary
 
 **How it works**
 
-* This dashboard reads from a folder within the project labeled "Wilderlab_full_results". Wilderlab results can simply be copied and dropped into the folder. Reading is automatic.
-
-
+* This dashboard automatically reads from either:
+  1. from the Wilderlab API. Your organisation's API details must be stored as an excel spread sheet and placed in the API keys folder.
+  1. a folder within the project labeled "Wilderlab_full_results". Wilderlab results (excel worksheets) can simply be copied and dropped into the folder. Note that manual modification of the worksheets risks making them unreadable.
+  
 <br/>
 
 **Tabs and interactivity**
 
-1. **Select area tab:** The colour of the circle point represents the average TICI value for the GPS location across time. You must select the points you want to include for further analysis. You can either use either a circle, polygon, or rectangle tool. If using the polygon tool you must complete the polygon by returning to and clicking on the starting point. At this point your spatial selection had been completed. For other tools the selection is completed as soon as the mouse is released. Only one spatial selection can be processed at a time. Background layers can be changed using the layer icon.
+* **Select area tab:** The colour of the circle point represents the average TICI value for the GPS location across time. You must select the points you want to include for further analysis. You can either use either a circle, polygon, or rectangle tool. If using the polygon tool you must complete the polygon by returning to and clicking on the starting point. At this point your spatial selection had been completed. For other tools the selection is completed as soon as the mouse is released. Only one spatial selection can be processed at a time. Background layers can be changed using the layer icon.
 
-1. **Trend tab:** This tab allows the user to check for changes over time at the same (or nearby sampling locations). Locations are changed to the NZ Transverse Mercator grid (NZTM) to facilitate better distance measurement. Lines of best fit on the graphs are estimated via linear regression. As sampling, naming, and recording discrepancies will complicate the identification of resampled sites the widget, **Aggregate points**, is provided. This widget allows the user to aggregate locations within a certain ditsance of each other. The new NZTM location which labels the points is the centroid of the points.   As the NZTM locations are esoteric any given positions can be manually entered into the **Flag Position** input boxes, the point will be then be revealed as an obvious marker on the *Select area* tab.
+* **Trend tab:** This tab allows the user to check for changes over time at the same (or nearby sampling locations). Locations are changed to the NZ Transverse Mercator grid (NZTM) to facilitate better distance measurement. Lines of best fit on the graphs are estimated via linear regression. As sampling, naming, and recording discrepancies will complicate the identification of resampled sites the widget, **Aggregate points**, is provided. This widget allows the user to aggregate locations within a certain ditsance of each other. The new NZTM location which labels the points is the centroid of the points.   As the NZTM locations are esoteric any given positions can be manually entered into the **Flag Position** input boxes, the point will be then be revealed as an obvious marker on the *Select area* tab.
 
    * To download the graph hover over it. This will reveal icons in the right hand corner. 
    * Click the camera icon to save. 
@@ -765,7 +789,7 @@ renderPlotly({
 
 \newline
 
-3. **Data extract tab:** a simplified version of the data within the selected area is shown here. By click on the arrows at the top of each column you can sort the data set by the specific variable.
+* **Data extract tab:** a simplified version of the data within the selected area is shown here. By click on the arrows at the top of each column you can sort the data set by the specific variable.
 
    * The data from the selected area can be downloaded as a csv by clicking on the **Download as csv file** button.
    
@@ -775,14 +799,38 @@ renderPlotly({
 
 The dashboard was constructed under R version 4.2.0. To improve reproducibility the final version will use "renv" to ensuring the compatibility of the package. The final project will be available from github and be licensed under a permissive MIT license.
 
+<br/>
+
+**Glossary**
+
+* **API** = *Application programming interface*
+  * An application programming interface is a set of protocols (defined by code) that enable two software programs to communicate. Access to an API is generally controlled by keys and passwords.
+
+* **NZTM** = *New Zealand Transverse mercator*
+
+  * New Zealand Transverse Mercator is currently the  standard coordinate system for general mapping in New Zealand. As a flat projection it has an advantages over latitude and longitude (an angular projection) in that it provides a constant distance relationship between points in a map. Consequently, it was used in this dashboard when points needed to be aggregated based on distance.
+  
+\newline
+
+* **TICI** = *Taxon-Independent Community Index*
+
+  * This index was developed by Wilderlab to condense a large amount of DNA sequence information into a single metric for better understanding stream health. The TICI works in a similar way to the macroinvertebrate community index. However, the TICI uses eDNA sequences from a wide range of organisms rather than just invertebrate taxa. TICI values are bound between 0 and 200. 
+
+  * For more information please visit the [Wilderlab website](https://www.wilderlab.co.nz/) or their [TICI specific page](https://www.wilderlab.co.nz/tici) (note that the existence of these webpages in the future cannot be guaranteed).
+
+
 ### Check
 
 ```{r}
 renderPrint({
   
-  str(my.graph.data())
+  str(download.table())
   
 })
 
+
 ```
+
+
+
 
