@@ -44,7 +44,7 @@ library(wilderlab)
 library(insect)
 
 # remotes::install_github("wilderlabnz/wilderlab") 
-# check
+
 
 ```
 
@@ -176,7 +176,7 @@ sp.file <- eventReactive(input$mymap_draw_new_feature,{
 
 tici.df <- reactive ({
   if (input$choice == "wilderlab") {
-    APIs <-  read_excel("API keys/API keys.xlsx")
+    APIs <-  read_excel("API keys.xlsx")
     samples <-
       get_wilderdata(
         "samples",
