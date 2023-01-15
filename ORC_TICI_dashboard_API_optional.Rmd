@@ -105,8 +105,6 @@ radioButtons(
 
 **Aggregate points **
 
-*Small differences in GPS readings will cause re-sampled points to be treated as entirely different locations. We can resolve this by aggregating readings through stipulating the maximum distance between re-sampled points.*
-
 
 ```{r}
 sliderInput("precision", label = "Max distance (metres):", min = 1, 
@@ -174,18 +172,27 @@ sp.file <- eventReactive(input$mymap_draw_new_feature,{
 ```{r}
 # API subroutine
 
+APIs <-  read_excel("API keys.xlsx")
+
 tici.df <- reactive ({
   if (input$choice == "wilderlab") {
-    APIs <-  read_excel("API keys.xlsx")
-    samples <-
-      get_wilderdata(
-        "samples",
-        key = APIs$key,
-        secret = APIs$secret,
-        xapikey = APIs$xapikey
-      )
     
-    tici.df <- samples
+    samples <- NULL
+    
+    for (i in 1:nrow(APIs)) {
+      samples[[i]] <-
+        get_wilderdata(
+          "samples",
+          key = APIs$key[i],
+          secret = APIs$secret[i],
+          xapikey = APIs$xapikey[i]
+        )
+      
+    }
+    
+    
+    tici.df <- bind_rows(samples)
+    
     
     # make tici rating categories
     tici.df$TICIRating <-
@@ -257,9 +264,9 @@ tici.df <- reactive ({
     # make extraction function
     
     extract.meta <- function(x) {
-      metadata <- x[19:nrow(x),]
-      colnames(metadata) <- metadata[1,]
-      metadata <- data.frame(metadata[2:nrow(metadata),])
+      metadata <- x[19:nrow(x), ]
+      colnames(metadata) <- metadata[1, ]
+      metadata <- data.frame(metadata[2:nrow(metadata), ])
       
     }
     
@@ -444,7 +451,7 @@ my.leaflet <- reactive({
                        layersControlOptions(collapsed = FALSE)) %>%
     
     addLayersControl(
-      baseGroups = c("World", "Terrain", "Open Street Map", "Ocean"),
+      baseGroups = c("World", "Terrain", "Open Street Map", "Ocean Basemap"),
       # position it on the topleft
       position = "topleft"
     ) %>%
@@ -795,6 +802,12 @@ renderPlotly({
    * The data from the selected area can be downloaded as a csv by clicking on the **Download as csv file** button.
    
 <br/>
+
+**Aggregate points**
+
+* Small differences in GPS readings will cause re-sampled points to be treated as entirely different locations. We can resolve this by aggregating readings through stipulating the maximum distance between re-sampled points. This will ensure that minor discrepancies in sampling location do not result in the creation of new sites.
+
+<br/>
    
 **R compatibility**
 
@@ -805,7 +818,10 @@ The dashboard was constructed under R version 4.2.0. To improve reproducibility 
 **Glossary**
 
 * **API** = *Application programming interface*
+
   * An application programming interface is a set of protocols (defined by code) that enable two software programs to communicate. Access to an API is generally controlled by keys and passwords.
+
+\newline
 
 * **NZTM** = *New Zealand Transverse mercator*
 
@@ -820,12 +836,24 @@ The dashboard was constructed under R version 4.2.0. To improve reproducibility 
   * For more information please visit the [Wilderlab website](https://www.wilderlab.co.nz/) or their [TICI specific page](https://www.wilderlab.co.nz/tici) (note that the existence of these webpages in the future cannot be guaranteed).
 
 
-### Check
+### API check
 
 ```{r}
-renderPrint({
+renderUI({
   
-  str(download.table())
+  exists <- file.exists("API keys.xlsx")
+  
+  check1 <- paste(
+    "Does API file exist in expected location: ",
+    exists)
+  
+  check2 <- paste("Names of organisations contributing: ",
+    paste(unique(APIs$`Shared APIs`), collapse = ", "))
+  
+  check3 <- paste("Number of unique APIs: ", nrow(APIs))
+    
+  HTML(paste(check1, check2, check3, sep="<br/>"))
+  
   
 })
 
