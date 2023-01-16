@@ -28,6 +28,28 @@ font-family: "Candara";
 
 
 ```{r}
+# Autoinstall
+# install remotes, pacman, wilderlab if not already installed
+
+invisible(if(!("remotes" %in% list.files(.libPaths()))) install.packages("remotes"))
+invisible(if(!("pacman" %in% list.files(.libPaths()))) install.packages("pacman"))
+invisible(if(!("wilderlab" %in% list.files(.libPaths()))) remotes::install_github("wilderlabnz/wilderlab"))
+
+# load via pacman required packages
+pacman::p_load("sf",
+               "leaflet",
+               "lubridate",
+               "leaflet.extras",
+               "geojsonsf",
+               "jsonify",
+               "plotly",
+               "viridisLite",
+               "igraph",
+               "DT",
+               "insect",
+               "shiny",
+               "flexdashboard")
+
 library(tidyverse)
 library(readxl)
 library(sf)
@@ -42,10 +64,6 @@ library(igraph)
 library(DT)
 library(wilderlab)
 library(insect)
-
-# remotes::install_github("wilderlabnz/wilderlab") 
-
-
 ```
 
 ```{r}
@@ -417,7 +435,7 @@ my.leaflet <- reactive({
   leaflet(options = leafletOptions(worldCopyJump = TRUE)) %>%
     
     # add base maps
-    addProviderTiles("Esri.OceanBasemap", group = "Ocean Basemap") %>%
+    # addProviderTiles("Esri.OceanBasemap", group = "Ocean Basemap") %>%
     addProviderTiles("OpenStreetMap",
                      # give the layer a name
                      group = "Open Street Map") %>%
@@ -451,7 +469,7 @@ my.leaflet <- reactive({
                        layersControlOptions(collapsed = FALSE)) %>%
     
     addLayersControl(
-      baseGroups = c("World", "Terrain", "Open Street Map", "Ocean Basemap"),
+      baseGroups = c("World", "Terrain", "Open Street Map"),
       # position it on the topleft
       position = "topleft"
     ) %>%
@@ -849,7 +867,7 @@ renderUI({
   check2 <- paste("Names of organisations contributing: ",
     paste(unique(APIs$`Shared APIs`), collapse = ", "))
   
-  check3 <- paste("Number of unique APIs: ", nrow(APIs))
+  check3 <- paste("Number of APIs: ", nrow(APIs))
     
   HTML(paste(check1, check2, check3, sep="<br/>"))
   
