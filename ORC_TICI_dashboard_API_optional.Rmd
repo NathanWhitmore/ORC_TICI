@@ -651,18 +651,17 @@ my.plot <- reactive ({
     ylab("TICI Score") +
     theme(axis.title.y = element_text(
       size = 16,
-      face = "bold",
       margin = margin(r = 10)
     )) +
     theme(axis.title.x = element_text(
       size = 16,
-      face = "bold",
       margin = margin(t = 10)
     )) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
     theme(plot.margin = margin(1, 1, 1.5, 1.2, "cm")) +
     labs(colour = "TICI rating\n") +
-    ggtitle("Locations given in NZTM")+
+    ggtitle(paste("Locations given in NZTM based on a ", 
+    input$precision, "m aggregation"))+
     scale_x_date(date_labels = "%d %b %Y")
   
   # turn off hover info for geom_line
