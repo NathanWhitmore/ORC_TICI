@@ -68,7 +68,7 @@ library(insect)
 
 ```{r}
 # read otago shape file
-NZ <- st_read("Data/regional-council-2022-generalised.shp", quiet = TRUE)
+NZ <- st_read("Regional boundaries/regional-council-2022-generalised.shp", quiet = TRUE)
 NZ  <- NZ %>% st_transform(crs = 4326)
 
 # special function
@@ -655,7 +655,7 @@ my.plot <- reactive ({
                                       "100 - good",
                                       "110 - excellent",
                                       "120 - pristine"),
-                           limits = c(60, 130)
+                           limits = c(50, 140)
                            ) +
     geom_smooth(method = "lm",
                 se = FALSE,
@@ -804,7 +804,9 @@ renderPlotly({
 
 * **Select area tab:** The colour of the circle point represents the average TICI value for the GPS location across time. You must select the points you want to include for further analysis. You can either use either a circle, polygon, or rectangle tool. If using the polygon tool you must complete the polygon by returning to and clicking on the starting point. At this point your spatial selection had been completed. For other tools the selection is completed as soon as the mouse is released. Only one spatial selection can be processed at a time. Background layers can be changed using the layer icon.
 
-* **Trend tab:** This tab allows the user to check for changes over time at the same (or nearby sampling locations). Locations are changed to the NZ Transverse Mercator grid (NZTM) to facilitate better distance measurement. Lines of best fit on the graphs are estimated via linear regression. As sampling, naming, and recording discrepancies will complicate the identification of resampled sites the widget, **Aggregate points**, is provided. This widget allows the user to aggregate locations within a certain ditsance of each other. The new NZTM location which labels the points is the centroid of the points.   As the NZTM locations are esoteric any given positions can be manually entered into the **Flag Position** input boxes, the point will be then be revealed as an obvious marker on the *Select area* tab.
+* **Aggregate points:** This widget allows the user to aggregate locations within a certain distance of each other. Locations are changed to the NZ Transverse Mercator grid (NZTM) to facilitate better distance measurement. The new NZTM location which labels any given location is the centroid of the points within the aggregation distance.   As the NZTM locations are esoteric any given positions can be manually entered into the **Flag Position** input boxes, the point will be then be revealed as a blue marker on the *Select area* tab.
+
+* **Trend tab:** This tab allows the user to check for changes over time at the same (or nearby sampling locations). Lines of best fit on the graphs are estimated via linear regression.
 
    * To download the graph hover over it. This will reveal icons in the right hand corner. 
    * Click the camera icon to save. 
@@ -814,9 +816,10 @@ renderPlotly({
 
 \newline
 
-* **Data extract tab:** a simplified version of the data within the selected area is shown here. By click on the arrows at the top of each column you can sort the data set by the specific variable.
+* **Data extract tab:** a simplified version of the data within the selected area is shown on screen for quick exploratory work.
 
-   * The data from the selected area can be downloaded as a csv by clicking on the **Download as csv file** button.
+   * By clicking on the arrows at the top of each column you can sort the data set by the specific variable.
+   * The data from the selected area can be downloaded as a more comprehensive csv file by clicking on the **Download as csv file** button.
    
 <br/>
 
@@ -828,7 +831,7 @@ renderPlotly({
    
 **R compatibility**
 
-The dashboard was constructed under R version 4.2.0. To improve reproducibility the final version will use "renv" to ensuring the compatibility of the package. The final project will be available from github and be licensed under a permissive MIT license.
+The dashboard was constructed under R version 4.2.0. The final project will be available from github and be licensed under a permissive MIT license. Note the base maps used in the dashboard are controlled by a 3rd party and can be discontinued by them without notice. The availability of different maps can be checked [here](https://leaflet-extras.github.io/leaflet-providers/preview/).
 
 <br/>
 
