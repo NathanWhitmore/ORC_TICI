@@ -662,7 +662,7 @@ my.plot <- reactive ({
                 colour = "grey") +
     geom_point(size = 3,
                shape = 20,
-               alpha = 0.8) +
+               alpha = 0.7) +
     
     facet_wrap(~ Location) +
     xlab("Collection Date") +
@@ -678,7 +678,7 @@ my.plot <- reactive ({
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
     theme(plot.margin = margin(1, 1, 1.5, 1.2, "cm")) +
     labs(colour = "TICI rating\n") +
-    ggtitle(paste("Locations given in NZTM based on a ", 
+    ggtitle(paste("Locations given in NZTM based on a", 
     input$precision, "m aggregation"))+
     scale_x_date(date_labels = "%d %b %Y")
   
@@ -746,6 +746,8 @@ renderPlotly({
             `TICI reliability` = TICIReliability,
             `TICI version` = TICIVersion)
    
+   table.data$radius <- NULL
+   
    table.data
     
   })
@@ -783,7 +785,9 @@ renderPlotly({
            Y,
            Location))
   
-  download.table 
+  download.table$radius <- NULL 
+  
+  download.table
   
 })
 
@@ -819,7 +823,7 @@ renderPlotly({
 * **Data extract tab:** a simplified version of the data within the selected area is shown on screen for quick exploratory work.
 
    * By clicking on the arrows at the top of each column you can sort the data set by the specific variable.
-   * The data from the selected area can be downloaded as a more comprehensive csv file by clicking on the **Download as csv file** button.
+   * The data from the selected area can be downloaded as a csv file by clicking on the **Download as csv file**. The data fields will emulate the Wilderlab API format and contain more information that present in the onscreen table.
    
 <br/>
 
@@ -867,13 +871,14 @@ renderUI({
     "Does API file exist in expected location: ",
     exists)
   
-  check2 <- paste("Names of organisations contributing: ",
+  check2 <- paste("Names of organisations contributing API keys: ",
     paste(unique(APIs$`Shared APIs`), collapse = ", "))
   
   check3 <- paste("Number of APIs: ", nrow(APIs))
-    
-  HTML(paste(check1, check2, check3, sep="<br/>"))
   
+  check4 <- paste("Is API / Are APIs selected: ", input$choice == "wilderlab")
+    
+  HTML(paste(check1, check2, check3, check4, sep="<br/>"))
   
 })
 
