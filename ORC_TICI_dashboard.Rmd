@@ -93,12 +93,14 @@ group_points <- function(points, distance){
 Column {.sidebar}
 -----------------------------------------------------------------------
 
+Please refer to instruction & glossary tab for help.
+
 **Upload data from**
 
 ```{r}
 radioButtons(
   "choice",
-  label = "",
+  label = "Either:",
   choices = list("Wilderlab API" = "wilderlab", 
                  "Local drive" = "local"),
   selected = "wilderlab"
@@ -508,7 +510,8 @@ my.leaflet <- reactive({
     ) %>%
     
     addScaleBar(position = "topright",
-              options = scaleBarOptions(imperial = FALSE))
+              options = scaleBarOptions(imperial = FALSE)) %>%
+    addMiniMap()
  
 
 })
@@ -618,6 +621,24 @@ my.graph.data <-
       paste(round(my.data$X, 0), "E", round(my.data$Y, 0), "N")
     my.data$geometry <- NULL
     my.data$st_union.geometry. <- NULL
+    
+    # make lat long coordinates
+    my.lat.long <- st_as_sf(my.data,                         
+               coords = c("X", "Y"),
+               crs = 2193) %>% 
+      st_transform(crs = 4326) %>% 
+      st_coordinates()
+    
+    # remove them to prevent duplicated names
+    my.data$X <- NULL
+    my.data$Y <- NULL
+    
+    #bind
+    my.data <- cbind(my.data, my.lat.long)
+    
+    # add to Location
+    # my.data$Location <- paste( my.data$Location, my.data$X, my.data$Y)
+    
     my.data
 
   })
@@ -626,37 +647,40 @@ my.graph.data <-
 my.plot <- reactive ({
   
   # my viridis palette padded to provide more variability in middle
-  pal <-   rev(c("#0D0887FF", viridis(n=6), "#F0F921FF"))
-  
+#  pal <-   rev(c("#0D0887FF", viridis(n=6), "#F0F921FF"))
+  pal <-   c(viridis(n=6))
 
   my.plot <-  ggplot(
     my.graph.data(),
     aes(
       x = CollectionDate,
       y = TICI,
-      colour = TICI,
+      colour = TICIRating,
       text = paste(
         "Collection date:",  CollectionDate,
         "\nClient ID:", ClientSampleID,
         "\nTICI score",  TICI,
         "\nTICI rating",  TICIRating,
-        "\nTICI reliability:",TICIReliability
+        "\nTICI reliability:",TICIReliability,
+        "\nLatitude:",round(Y, 5),
+        "\nLongitude:", round(X, 5)
 
       ),
       group = Location
     )
   ) +
     theme_bw() +
-    scale_colour_gradientn(colours = pal, 
-                           breaks = c(70, 80, 90, 100, 110, 120),
-                           labels = c("70 - very poor",
-                                      "80 - poor",
-                                      "90 - average",
-                                      "100 - good",
-                                      "110 - excellent",
-                                      "120 - pristine"),
-                           limits = c(50, 140)
-                           ) +
+      #  scale_colour_graidentn(colours = pal, 
+   #                        breaks = c(70, 80, 90, 100, 110, 120),
+   #                        labels = c("70 - very poor",
+   #                                   "80 - poor", "90 - average",
+  #                                    "100 - good",
+  #                                    "110 - excellent",
+  #                                    "120 - pristine"),
+   #                        limits = c(50, 140)
+   #                        ) 
+ scale_colour_manual(values = pal, drop = FALSE) +
+    
     geom_smooth(method = "lm",
                 se = FALSE,
                 colour = "grey") +
@@ -664,9 +688,9 @@ my.plot <- reactive ({
                shape = 20,
                alpha = 0.7) +
     
-    facet_wrap(~ Location) +
-    xlab("Collection Date") +
-    ylab("TICI Score") +
+    facet_wrap(~ Location, labeller = label_wrap_gen(multi_line = TRUE)) +
+    xlab("Collection date") +
+    ylab("TICI score") +
     theme(axis.title.y = element_text(
       size = 16,
       margin = margin(r = 10)
@@ -781,8 +805,6 @@ renderPlotly({
     select(-c(X_leaflet_id, 
            feature_type,
            group,
-           X,
-           Y,
            Location))
   
   download.table$radius <- NULL 
@@ -886,5 +908,16 @@ renderUI({
 ```
 
 
+### somethnkng
+
+```{r}
+
+renderPrint({
+  
+  head(my.graph.data())
+      
+})
+
+```
 
 
